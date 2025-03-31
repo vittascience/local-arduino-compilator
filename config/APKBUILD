@@ -1,0 +1,30 @@
+# Contributor: Thomas Dumazet <thomas.dumazet@vittascience.com>
+# Maintainer: Thomas Dumazet <thomas.dumazet@vittascience.com>
+pkgname=arduino-libs
+pkgver=1.0
+pkgrel=0
+pkgdesc="Arduino core libraries for Alpine"
+url="https://www.arduino.cc"
+arch="x86 x86_64"
+license="LGPL-2.1"
+source="arduino-core.tar.gz"
+depends=""
+makedepends=""
+subpackages=""
+options="!check"
+
+build() {
+    return 0
+}
+
+package() {
+    mkdir -p "$pkgdir/usr/share/arduino"
+    cp -r "$srcdir" "$pkgdir/usr/share/arduino/"
+    # cp -r "$srcdir/cores" "$pkgdir/usr/share/arduino/"
+    # cp -r "$srcdir/variants" "$pkgdir/usr/share/arduino/"
+    # cp -r "$srcdir/externals" "$pkgdir/usr/share/arduino/"
+    # cp "$srcdir/boards.txt" "$pkgdir/usr/share/arduino/"
+    # cp "$srcdir/platform.txt" "$pkgdir/usr/share/arduino/"
+}
+
+sha512sums="SKIP"

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>In browser arduino compilation</title>
+</head>
+<body>
+    <p>Paste your cpp code below and click on the compile button</p>
+    <form id="compile-form" action="#">
+        <div>
+            <textarea name="code-input" id="code-input" style="width: 100%; height: 500px;"></textarea>
+        </div>
+        <div>
+            <button id="compile-btn">Compile</button>
+        </div>
+    </form>
+
+
+
+    <script type="module" src="./public/js/scripts/vittaCompilation/VittaCompilator.js"></script>
+    <script>
+        function initialize() {
+            vittaCompilator._init(); // Initializing the compilator ASAP to earn some time
+            
+            // BELOW THE LIST OF ALL THE EVENTS TRIGGERED BY THE COMPILATOR
+            // Downloading progress event
+            vittaCompilator.on('downloadProgress', 'logDownloadProgress', (percentage) => {
+                console.log(`Downloading local compilator: ${percentage}%`);
+            });
+            // Download completion event
+            vittaCompilator.on('downloadComplete', 'logDownloadComplete', () => {
+                console.log(`Local compilator downloaded. Loading the VM... This may take few minutes!`);
+            });
+            // Emulator loaded event
+            vittaCompilator.on('emulatorLoaded', 'logEmulatorLoaded', () => {
+                console.log(`VM loaded, compilator ready!`);
+            });
+            // Compilation error event
+            vittaCompilator.on('commandError', 'logCommandError', (error) => {
+                console.warn(error);
+            });
+            // cpp file creation event
+            vittaCompilator.on('cppFileCreated', 'logCppFileCreated', () => {
+                console.log(`cpp file created successfully!`);
+            });
+            // object file creation event
+            vittaCompilator.on('objectFileCreated', 'logObjectFileCreated', () => {
+                console.log(`Object file created successfully!`);
+            });
+            // elf file creation event
+            vittaCompilator.on('elfFileCreated', 'logElfFileCreated', () => {
+                console.log(`elf file created successfully!`);
+            });
+            // hex file creation event
+            vittaCompilator.on('hexFileCreated', 'logHexFileCreated', () => {
+                console.log(`hex file created successfully!`);
+            });
+        }
+
+        async function compile(code) {
+            // To compile your arduino code, just pass it to the compileCode method of the compilator
+            const compiledCode = await vittaCompilator.compileCode(code);
+            console.log(compiledCode); // We just log the compiled hex code as this is just an example
+        }
+        // We wait the full page load before initializing the compilator
+        addEventListener("DOMContentLoaded", () => {
+            initialize();
+        });
+        // Below a simple example to provide the code to the compilator within the browser
+        const formElt = document.querySelector('#compile-form');
+        formElt.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const code = event.srcElement[0].value;
+            compile(code);
+        });
+        
+    </script>
+</body>
+</html>
