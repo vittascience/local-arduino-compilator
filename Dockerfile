@@ -70,6 +70,55 @@ RUN find /home/arduino-core/atmega328p/ \
     avr-ar rcs /home/arduino-core/atmega328p/lib/core.a $(cat /tmp/objects.txt) && \
     echo "✅ core.a successfully compiled!"
 
+# Copy arduino atmega2560 libraries and precompile them
+COPY ./libs/arduino-core /home/arduino-core/atmega2560_tmp
+RUN rsync -av --progress /home/arduino-core/atmega2560_tmp/ /home/arduino-core/atmega2560/ --exclude=firmwares && \
+    rm -rf /home/arduino-core/atmega2560_tmp
+
+RUN mkdir -p /home/arduino-core/atmega2560/lib && \
+    avr-gcc -Os -mmcu=atmega2560 \
+        -DF_CPU=16000000L -DARDUINO=184 -DINCLUDE_PULSEIN -UEXCLUDE_PULSEIN \
+        -x assembler-with-cpp \
+        -I/home/arduino-core/atmega2560/cores/arduino \
+        -I/home/arduino-core/atmega2560/variants/standard \
+        -I/home/arduino-core/atmega2560 \
+        -c /home/arduino-core/atmega2560/cores/arduino/wiring_pulse.S \
+        -o /home/arduino-core/atmega2560/cores/arduino/wiring_pulse.S.o && \
+    avr-ar rcs /home/arduino-core/atmega2560/lib/core_extras.a /home/arduino-core/atmega328p/cores/arduino/wiring_pulse.S.o && \
+    echo "✅ core_extras.a (wiring_pulse.S) successfully compiled!"
+
+RUN find /home/arduino-core/atmega2560/ \
+        \( -path "*/firmwares/*" -o -path "*/extras/*" -o -path "*/examples/*" \
+        -o -path "*/bootloaders/*" -o -path "*/drivers/*" -o -path "*/libraries/*" \
+        -o -path "*/LP examples/*" \) -prune -o \
+        -type f \( -name "*.c" -o -name "*.cpp" \) -print > /tmp/sources.txt && \
+    find /home/arduino-core/atmega2560/externals \
+        \( -path "*/firmwares/*" -o -path "*/extras/*" -o -path "*/examples/*" \
+        -o -path "*/bootloaders/*" -o -path "*/drivers/*" -o -path "*/libraries/*" \
+        -o -path "*/LP examples/*" \) -prune -o \
+        -type d -print > /tmp/include_dirs.txt && \
+    if [ -s /tmp/include_dirs.txt ]; then \
+        INCLUDE_PATHS=$(awk '{print "-I" $0}' /tmp/include_dirs.txt | tr '\n' ' '); \
+    else \
+        INCLUDE_PATHS=""; \
+    fi && \
+    if [ -s /tmp/sources.txt ]; then \
+        while IFS= read -r file; do \
+            avr-gcc -Os -ffunction-sections -fdata-sections -fno-exceptions \
+                -mmcu=atmega2560 -DF_CPU=16000000L -DARDUINO=184 -DINCLUDE_PULSEIN -UEXCLUDE_PULSEIN \
+                -I/home/arduino-core/atmega2560/cores/arduino \
+                -I/home/arduino-core/atmega2560/variants/standard \
+                -I/home/arduino-core/atmega2560 \
+                $INCLUDE_PATHS \
+                -c "$file" -o "${file%.*}.o" || true; \
+        done < /tmp/sources.txt; \
+    else \
+        echo "⚠️ No source file found!"; \
+    fi && \
+    find /home/arduino-core/atmega2560 -name "*.o" > /tmp/objects.txt && \
+    avr-ar rcs /home/arduino-core/atmega2560/lib/core.a $(cat /tmp/objects.txt) && \
+    echo "✅ core.a successfully compiled!"
+
 RUN chmod -R 755 /home/arduino-core
 
 RUN getent group abuild || addgroup -S abuild && \

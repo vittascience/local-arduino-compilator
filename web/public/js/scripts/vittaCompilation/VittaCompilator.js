@@ -39,12 +39,12 @@ class VittaCompilator extends Observable {
      * @param {String} code - The code to be compiled
      * @returns {Promise} The compiled code
      */
-    async compileCode(code) {
+    async compileCode(code, compilationParameters = null) {
         if (this._isCompiling) return false;
         this._isCompiling = true;
         if (!this.compilatorLoaded && !this._isLoading) this._init();
         await this._awaitCompilatorLoaded();
-        const compiledCode = await this._compilator.compile(code);
+        const compiledCode = await this._compilator.compile(code, compilationParameters);
         this._isCompiling = false;
         return compiledCode;
     }

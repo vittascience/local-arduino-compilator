@@ -41,7 +41,7 @@ The iso file is built using two Docker containers. The main container uses mkima
 
 After the build, the iso file can be loaded using [v86](https://github.com/copy/v86). v86 emulates an x86-compatible CPU and hardware. Machine code is translated to WebAssembly modules at runtime in order to achieve decent performance.
 There is a javascript interface named vittaCompilator that's available in the global javascript scope. 
-It provides a `compileCode` method which needs a string as argument (the code to be compiled). This method returns a promise which will return the compiled hex code.
+It provides a `compileCode` method which needs a string as argument (the code to be compiled). It has an optional parameter that is an object containing compiling settings as following (those are the default ones): `{mcu: 'atmega328p', fcpu: '16000000L'}`. This method returns a promise which will return the compiled hex code.
 It also exposes event observables that can be registered to add reactions to these events. You can see the list below (you will want to replace the console.log by your own code):
 ```
 // Downloading progress event
@@ -77,3 +77,7 @@ vittaCompilator.on('hexFileCreated', 'logHexFileCreated', () => {
     console.log(`hex file created successfully!`);
 });
 ```
+
+
+## Known issues
+If the volumes `iso-builder` and/or `shared/packages` already exist, type `sudo chmod -R 777 iso-builder && sudo chmod -R 777 shared-packages` to allow the containers to use them

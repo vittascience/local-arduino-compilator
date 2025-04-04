@@ -45,54 +45,62 @@ class ArduinoCompilator extends Observable {
         this._currentCommand = null;
         this._commands = {
             compileObjectFile: {
-                command: [
-                    `sed -n 's/^#include <\\([^>]*\\)>/\\1/p' /root/main.cpp | sort -u > /tmp/included_headers.txt`,
-                    `sed -i 's/\r$//' /tmp/included_headers.txt`,
-                    `touch /tmp/used_libraries.txt`,
-                    `while read header; do`,
-                    `    lib_path=$(find /usr/share/arduino/src/atmega328p/externals -type f -name "$header" | head -n 1)`,
-                    `    if [[ -n "$lib_path" ]]; then`,
-                    `        dirname "$lib_path" >> /tmp/used_libraries.txt`,
-                    `    fi`,
-                    `done < /tmp/included_headers.txt`,
-                    `sort -u /tmp/used_libraries.txt -o /tmp/used_libraries.txt`,
-                    
-                    `INCLUDE_PATHS=$(awk '{print "-I" $0}' /tmp/used_libraries.txt | tr '\\n' ' ')`,
+                command: () => {
+                    return [
+                        `sed -n 's/^#include <\\([^>]*\\)>/\\1/p' /root/main.cpp | sort -u > /tmp/included_headers.txt`,
+                        `sed -i 's/\r$//' /tmp/included_headers.txt`,
+                        `touch /tmp/used_libraries.txt`,
+                        `while read header; do`,
+                        `    lib_path=$(find /usr/share/arduino/src/${this._compilationParameters.mcu}/externals -type f -name "$header" | head -n 1)`,
+                        `    if [[ -n "$lib_path" ]]; then`,
+                        `        dirname "$lib_path" >> /tmp/used_libraries.txt`,
+                        `    fi`,
+                        `done < /tmp/included_headers.txt`,
+                        `sort -u /tmp/used_libraries.txt -o /tmp/used_libraries.txt`,
+                        
+                        `INCLUDE_PATHS=$(awk '{print "-I" $0}' /tmp/used_libraries.txt | tr '\\n' ' ')`,
 
-                    `avr-g++ -w -DARDUINO_ARCH_AVR -Os -ffunction-sections -fdata-sections -fno-exceptions \\`,
-                    `    -I/usr/lib/avr/include \\`,
-                    `    -I/usr/share/arduino/src/atmega328p/cores/arduino \\`,
-                    `    -I/usr/share/arduino/src/atmega328p/variants/standard \\`,
-                    `    $INCLUDE_PATHS \\`,
-                    `    -mmcu=atmega328p -DARDUINO=184 -DF_CPU=16000000L -DUSB_VID=null -DUSB_PID=null -MMD \\`,
-                    `    -c -o /root/main.o /root/main.cpp\n`
-                ].join("\n"),
+                        `avr-g++ -w -DARDUINO_ARCH_AVR -Os -ffunction-sections -fdata-sections -fno-exceptions \\`,
+                        `    -I/usr/lib/avr/include \\`,
+                        `    -I/usr/share/arduino/src/${this._compilationParameters.mcu}/cores/arduino \\`,
+                        `    -I/usr/share/arduino/src/${this._compilationParameters.mcu}/variants/standard \\`,
+                        `    $INCLUDE_PATHS \\`,
+                        `    -mmcu=${this._compilationParameters.mcu} -DARDUINO=184 -DF_CPU=${this._compilationParameters.fcpu} -DUSB_VID=null -DUSB_PID=null -MMD \\`,
+                        `    -c -o /root/main.o /root/main.cpp\n`
+                    ].join("\n");
+                },
                 expectedOutput: [
                     '>     -c -o /root/main.o /root/main.cpp',
                     '/root # '
                 ]
             },
             compileElfFile: {
-                command: [
-                    `avr-gcc -w -Os -Wl,--gc-sections -mmcu=atmega328p -DARDUINO=184 -DF_CPU=16000000L -DUSB_VID=null -DUSB_PID=null \\`,
-                    `    /root/main.o \\`,
-                    `    -L/usr/share/arduino/src/atmega328p/lib -l:core.a \\`,
-                    `    -o /root/main.elf \\`,
-                    `    -lm -lc\n`
-                ].join("\n"),
+                command: () => {
+                    return [
+                        `avr-gcc -w -Os -Wl,--gc-sections -mmcu=${this._compilationParameters.mcu} -DARDUINO=184 -DF_CPU=${this._compilationParameters.fcpu} -DUSB_VID=null -DUSB_PID=null \\`,
+                        `    /root/main.o \\`,
+                        `    -L/usr/share/arduino/src/${this._compilationParameters.mcu}/lib -l:core.a \\`,
+                        `    -o /root/main.elf \\`,
+                        `    -lm -lc\n`
+                    ].join("\n");
+                },
                 expectedOutput: [
                     '>     -lm -lc',
                     '/root # '
                 ]
             },
             compileHexFile: {
-                command: 'avr-objcopy -O ihex -R .eeprom /root/main.elf /root/main.hex',
+                command: () => {
+                    return 'avr-objcopy -O ihex -R .eeprom /root/main.elf /root/main.hex';
+                },
                 expectedOutput: [
                     'avr-objcopy -O ihex -R .eeprom /root/main.elf /root/main.hex'
                 ]
             },
             getHexFileContent: {
-                command: 'cat /root/main.hex',
+                command: () => { 
+                    return 'cat /root/main.hex';
+                },
                 expectedOutput: [
                     ':'
                 ]
@@ -102,6 +110,7 @@ class ArduinoCompilator extends Observable {
         this._commandCheckResolve = null;
         this._commandCheckReject = null;
         this._expectedCommandOutput = null;
+        this._compilationParameters = null;
     }
 
     /**
@@ -159,6 +168,8 @@ class ArduinoCompilator extends Observable {
             autostart: true,
             bios: { url: `${this._arduinoLibs.seaBios.path}.${this._arduinoLibs.seaBios.extension}` },
             vga_bios: { url: `${this._arduinoLibs.vgaBios.path}.${this._arduinoLibs.vgaBios.extension}` },
+            disable_keyboard: true,
+            disable_mouse: true,
             cmdline: "console=ttyS0,115200"
         };
         /* To enable the emulator screen, you need to have the relevant dom elements:
@@ -283,8 +294,9 @@ class ArduinoCompilator extends Observable {
      * @param {String} code - The code to be compiled
      * @returns {String|boolean} the compiled code if succeded, false otherwise
      */
-    async compile(code) {
+    async compile(code, compilationParameters) {
         const compileCode = `#include <Arduino.h>\n${code}`;
+        this.setCompilationParameters(compilationParameters);   
         const cppFileCreated = await this._createCppFile(compileCode);
         const compilationResponse = {
             success: false,
@@ -339,7 +351,7 @@ class ArduinoCompilator extends Observable {
         this._clearSerialHistory();
         if (this._commands[command]) {
             expectedOutput = this._commands[command].expectedOutput;
-            command = this._commands[command].command;
+            command = this._commands[command].command();
         }
         command = [
             command,
@@ -499,6 +511,24 @@ class ArduinoCompilator extends Observable {
             return false;
         });
         return `${filteredHexFileLines.join("\r\n")}\r\n`;
+    }
+
+    /**
+     * Set the compiling parameters (mcu and fcpu)
+     * @public
+     * @param {Object} parameters The compiling parameters
+     */
+    setCompilationParameters(parameters) {
+        let mcu = 'atmega328p';
+        let fcpu = '16000000L';
+        if (parameters !== null) {
+            mcu = parameters.mcu ? parameters.mcu : mcu;
+            fcpu = parameters.fcpu ? parameters.fcpu : fcpu;
+        }
+        this._compilationParameters = {
+            mcu: mcu,
+            fcpu: fcpu
+        }
     }
 }
 
